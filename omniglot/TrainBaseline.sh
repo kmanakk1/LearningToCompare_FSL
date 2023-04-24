@@ -1,4 +1,4 @@
-#!/bin/sh
+#!/bin/bash
 # kmanakk1 - script to repeat training for models demonstrated in the paper for omniglot
 LOGDIR="logs"
 EPOCHS="100000"
