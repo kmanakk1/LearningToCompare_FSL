@@ -106,7 +106,7 @@ class RelationNetwork(nn.Module):
         out = self.layer2(out)
         out = out.view(out.size(0),-1)
         out = F.relu(self.fc1(out))
-        out = F.sigmoid(self.fc2(out))
+        out = torch.sigmoid(self.fc2(out))
         return out
 
 def weights_init(m):
@@ -166,8 +166,11 @@ def main():
                 sample_dataloader = tg.get_data_loader(task,num_per_class=SAMPLE_NUM_PER_CLASS,split="train",shuffle=False,rotation=degrees)
                 test_dataloader = tg.get_data_loader(task,num_per_class=SAMPLE_NUM_PER_CLASS,split="test",shuffle=True,rotation=degrees)
 
-                sample_images,sample_labels = sample_dataloader.__iter__().next()
-                test_images,test_labels = test_dataloader.__iter__().next()
+                # kmanakk1 - change how we get samples for compatability with pytorch 1.7
+                sample_iterator = iter(sample_dataloader)
+                sample_images,sample_labels = next(sample_iterator)
+                test_iterator = iter(test_dataloader)
+                test_images,test_labels = next(test_iterator)
 
                 # calculate features
                 sample_features = feature_encoder(Variable(sample_images).cuda(GPU)) # 5x64
