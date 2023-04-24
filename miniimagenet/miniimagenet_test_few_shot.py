@@ -67,7 +67,7 @@ class CNNEncoder(nn.Module):
                         nn.ReLU(),
                         nn.MaxPool2d(2))
         self.layer3 = nn.Sequential(
-                        nn.Conv2d(64,64,kernel_size=3,padding=1),
+                        nn.Conv2d(64,64,kernel_size=3, padding=1),
                         nn.BatchNorm2d(64, momentum=1, affine=True),
                         nn.ReLU())
         self.layer4 = nn.Sequential(
@@ -105,7 +105,7 @@ class RelationNetwork(nn.Module):
         out = self.layer2(out)
         out = out.view(out.size(0),-1)
         out = F.relu(self.fc1(out))
-        out = F.sigmoid(self.fc2(out))
+        out = torch.sigmoid(self.fc2(out))
         return out
 
 def weights_init(m):
@@ -166,7 +166,10 @@ def main():
                 num_per_class = 5
                 test_dataloader = tg.get_mini_imagenet_data_loader(task,num_per_class=num_per_class,split="test",shuffle=False)
 
-                sample_images,sample_labels = sample_dataloader.__iter__().next()
+                # kmanakk1 - change how we get samples for compatability with pytorch 1.7
+                sample_iterator = iter(sample_dataloader)
+                sample_images,sample_labels = next(sample_iterator)
+
                 for test_images,test_labels in test_dataloader:
                     batch_size = test_labels.shape[0]
                     # calculate features

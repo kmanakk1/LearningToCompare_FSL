@@ -171,8 +171,13 @@ def main():
         batch_dataloader = tg.get_mini_imagenet_data_loader(task,num_per_class=BATCH_NUM_PER_CLASS,split="test",shuffle=True)
 
         # sample datas
-        samples,sample_labels = sample_dataloader.__iter__().next()
-        batches,batch_labels = batch_dataloader.__iter__().next()
+        # kmanakk1 - change how we get samples for compatability with pytorch 1.7
+        sample_iterator = iter(sample_dataloader)
+        batch_iterator = iter(batch_dataloader)
+        #samples,sample_labels = sample_dataloader.__iter__().next()
+        #batches,batch_labels = batch_dataloader.__iter__().next()
+        samples, sample_labels = next(sample_iterator)
+        batches,batch_labels = next(batch_iterator)
 
         # calculate features
         sample_features = feature_encoder(Variable(samples).cuda(GPU)) # 5x64*5*5
@@ -199,8 +204,9 @@ def main():
 
         loss.backward()
 
-        torch.nn.utils.clip_grad_norm(feature_encoder.parameters(),0.5)
-        torch.nn.utils.clip_grad_norm(relation_network.parameters(),0.5)
+        # kmanakk1 - make compatible with pytorch 1.7
+        torch.nn.utils.clip_grad_norm_(feature_encoder.parameters(),0.5)
+        torch.nn.utils.clip_grad_norm_(relation_network.parameters(),0.5)
 
         feature_encoder_optim.step()
         relation_network_optim.step()
@@ -222,7 +228,12 @@ def main():
 
                 num_per_class = 3
                 test_dataloader = tg.get_mini_imagenet_data_loader(task,num_per_class=num_per_class,split="test",shuffle=True)
-                sample_images,sample_labels = sample_dataloader.__iter__().next()
+
+                # kmanakk1 - change: make compatible with pytorch 1.7
+                #sample_images,sample_labels = sample_dataloader.__iter__().next()
+                sample_img_iter = iter(sample_dataloader)
+                sample_images,sample_labels = next(sample_img_iter)
+
                 for test_images,test_labels in test_dataloader:
                     batch_size = test_labels.shape[0]
                     # calculate features
@@ -260,10 +271,6 @@ def main():
                 print("save networks for episode:",episode)
 
                 last_accuracy = test_accuracy
-
-
-
-
 
 if __name__ == '__main__':
     main()
