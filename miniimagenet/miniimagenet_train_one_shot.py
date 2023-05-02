@@ -105,7 +105,7 @@ class RelationNetwork(nn.Module):
         out = self.layer2(out)
         out = out.view(out.size(0),-1)
         out = F.relu(self.fc1(out))
-        out = F.sigmoid(self.fc2(out))
+        out = torch.sigmoid(self.fc2(out))
         return out
 
 def weights_init(m):
@@ -159,10 +159,6 @@ def main():
     last_accuracy = 0.0
 
     for episode in range(EPISODE):
-
-        feature_encoder_scheduler.step(episode)
-        relation_network_scheduler.step(episode)
-
         # init dataset
         # sample_dataloader is to obtain previous samples for compare
         # batch_dataloader is to batch samples for training
@@ -211,9 +207,11 @@ def main():
         feature_encoder_optim.step()
         relation_network_optim.step()
 
+        feature_encoder_scheduler.step()
+        relation_network_scheduler.step()
 
         if (episode+1)%100 == 0:
-                print("episode:",episode+1,"loss",loss.data[0])
+                print("episode:",episode+1,"loss",loss.data)
 
         if episode%5000 == 0:
 
