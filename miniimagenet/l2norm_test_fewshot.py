@@ -26,7 +26,7 @@ parser.add_argument("-w","--class_num",type = int, default = 5)
 parser.add_argument("-s","--sample_num_per_class",type = int, default = 5)
 parser.add_argument("-b","--batch_num_per_class",type = int, default = 10)
 parser.add_argument("-e","--episode",type = int, default= 10)
-parser.add_argument("-t","--test_episode", type = int, default = 600)
+parser.add_argument("-t","--test_episode", type = int, default = 10)
 parser.add_argument("-l","--learning_rate", type = float, default = 0.001)
 parser.add_argument("-g","--gpu",type=int, default=0)
 parser.add_argument("-u","--hidden_unit",type=int,default=10)
@@ -97,12 +97,14 @@ class RelationNetwork(nn.Module):
                         nn.BatchNorm2d(64, momentum=1, affine=True),
                         nn.ReLU(),
                         nn.MaxPool2d(2))
+        self.dropout = nn.Dropout(0.2)
         self.fc1 = nn.Linear(input_size*3*3,hidden_size)
         self.fc2 = nn.Linear(hidden_size,1)
 
     def forward(self,x):
         out = self.layer1(x)
         out = self.layer2(out)
+        out = self.dropout(out)
         out = out.view(out.size(0),-1)
         out = F.relu(self.fc1(out))
         out = torch.sigmoid(self.fc2(out))
@@ -141,20 +143,18 @@ def main():
 
     feature_encoder_optim = torch.optim.Adam(feature_encoder.parameters(),lr=LEARNING_RATE)
     feature_encoder_scheduler = StepLR(feature_encoder_optim,step_size=100000,gamma=0.5)
-    relation_network_optim = torch.optim.Adam(relation_network.parameters(),lr=LEARNING_RATE)
+    relation_network_optim = torch.optim.Adam(relation_network.parameters(),lr=LEARNING_RATE, weight_decay=0.001)
     relation_network_scheduler = StepLR(relation_network_optim,step_size=100000,gamma=0.5)
 
-    if os.path.exists(str("./models/miniimagenet_feature_encoder_" + str(CLASS_NUM) +"way_" + str(SAMPLE_NUM_PER_CLASS) +"shot.pkl")):
-        feature_encoder.load_state_dict(torch.load(str("./models/miniimagenet_feature_encoder_" + str(CLASS_NUM) +"way_" + str(SAMPLE_NUM_PER_CLASS) +"shot.pkl")))
+    if os.path.exists(str("./models/l2norm_feature_encoder_" + str(CLASS_NUM) +"way_" + str(SAMPLE_NUM_PER_CLASS) +"shot.pkl")):
+        feature_encoder.load_state_dict(torch.load(str("./models/l2norm_feature_encoder_" + str(CLASS_NUM) +"way_" + str(SAMPLE_NUM_PER_CLASS) +"shot.pkl")))
         print("load feature encoder success")
-    if os.path.exists(str("./models/miniimagenet_relation_network_"+ str(CLASS_NUM) +"way_" + str(SAMPLE_NUM_PER_CLASS) +"shot.pkl")):
-        relation_network.load_state_dict(torch.load(str("./models/miniimagenet_relation_network_"+ str(CLASS_NUM) +"way_" + str(SAMPLE_NUM_PER_CLASS) +"shot.pkl")))
+    if os.path.exists(str("./models/l2norm_relation_network_"+ str(CLASS_NUM) +"way_" + str(SAMPLE_NUM_PER_CLASS) +"shot.pkl")):
+        relation_network.load_state_dict(torch.load(str("./models/l2norm_relation_network_"+ str(CLASS_NUM) +"way_" + str(SAMPLE_NUM_PER_CLASS) +"shot.pkl")))
         print("load relation network success")
 
     total_accuracy = 0.0
     for episode in range(EPISODE):
-
-
             # test
             print("Testing...")
 
@@ -204,7 +204,7 @@ def main():
 
             total_accuracy += test_accuracy
 
-    print("aver_accuracy:",(total_accuracy/EPISODE)*100)
+    print("aver_accuracy:", (total_accuracy/EPISODE) * 100)
 
 
 
