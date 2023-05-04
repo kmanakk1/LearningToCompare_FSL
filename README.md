@@ -32,6 +32,7 @@ $ python3 l2norm_confusion_mtx.py
 $ python3 miniimagenet_confusion_mtx.py
 ```
 The resultant images will be output to miniimagenet/images/
+For the CIFAR-10 models, the procedure is similar, but I combined the confusion matrix and test scripts, so running ./Test.sh produces the confusion matricies.
 
 NOTE:
 Although the omniglot train and test scripts are in the repo, they have not yet been fully updated for python3 or pytorch > 0.4, so they won't run.
