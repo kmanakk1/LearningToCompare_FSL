@@ -179,6 +179,11 @@ def main():
             y_true.extend(test_labels.to("cpu"))
             y_pred.extend(predict_labels.to("cpu"))
 
+    # calculate accuracy
+    from sklearn.metrics import accuracy_score
+    accuracy = accuracy_score(y_true, y_pred)   # get accuracy
+    print(f"Test Accuracy: {accuracy}")
+
     # make confusion matrix
     cf_mtx = confusion_matrix(y_true, y_pred)
     df = pd.DataFrame(cf_mtx / np.sum(cf_mtx, axis=1)[:, None], index = [i for i in range(CLASS_NUM)],
