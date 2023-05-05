@@ -192,6 +192,7 @@ def main():
     plt.figure(figsize = (12,7))
     sn.heatmap(df, annot=True)
     if not os.path.exists('images'): os.makedirs('images')
+    plt.title('[mini-imagenet] Test set confusion matrix (baseline)')
     plt.savefig('images/miniimagenet_confusion_mtx.png')
 
 if __name__ == '__main__':

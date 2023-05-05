@@ -86,10 +86,10 @@ class CNNEncoder(nn.Module):
         out = self.layer4(out)
         return out
 
-class RelationNetwork(nn.Module):
+class L2RelationNetwork(nn.Module):
     """RelationNetwork"""
     def __init__(self,input_size,hidden_size):
-        super(RelationNetwork, self).__init__()
+        super(L2RelationNetwork, self).__init__()
         self.layer1 = nn.Sequential(
                         nn.Conv2d(64*2,64,kernel_size=3,padding=1),
                         nn.BatchNorm2d(64, momentum=1, affine=True),
@@ -115,6 +115,33 @@ class RelationNetwork(nn.Module):
         out = torch.sigmoid(self.fc2(out))  # torch.nn.functional.sigmoid is deprecated
         return out
 
+class RelationNetwork(nn.Module):
+    """RelationNetwork"""
+    def __init__(self,input_size,hidden_size):
+        super(RelationNetwork, self).__init__()
+        self.layer1 = nn.Sequential(
+                        nn.Conv2d(64*2,64,kernel_size=3,padding=1),
+                        nn.BatchNorm2d(64, momentum=1, affine=True),
+                        nn.ReLU(),
+                        nn.MaxPool2d(2)
+                        )
+        self.layer2 = nn.Sequential(
+                        nn.Conv2d(64,64,kernel_size=3,padding=1),
+                        nn.BatchNorm2d(64, momentum=1, affine=True),
+                        nn.ReLU(),
+                        nn.MaxPool2d(2)
+                        )
+        self.fc1 = nn.Linear(input_size*2*2,hidden_size)
+        self.fc2 = nn.Linear(hidden_size,1)
+
+    def forward(self,x):
+        out = self.layer1(x)
+        out = self.layer2(out)
+        out = out.view(out.size(0),-1)
+        out = F.relu(self.fc1(out))
+        out = torch.sigmoid(self.fc2(out))  # torch.nn.functional.sigmoid is deprecated
+        return out
+    
 def weights_init(m):
     classname = m.__class__.__name__
     if classname.find('Conv') != -1:
@@ -146,27 +173,25 @@ def main():
                                             shuffle=True, num_workers=2)
     classes = ('plane', 'car', 'bird', 'cat',
            'deer', 'dog', 'frog', 'horse', 'ship', 'truck')
-    # Step 1: init data folders
-    print("init data folders")
-
-    # Step 2: init neural networks
-    print("init neural networks")
-
-    feature_encoder = CNNEncoder()
-    relation_network = RelationNetwork(FEATURE_DIM,RELATION_DIM)
 
 
-    feature_encoder.cuda(GPU)
-    relation_network.cuda(GPU)
+    ## Test L2 Version
+    print("Testing wiht L2 regularization and dropout")
+
+    l2_feature_encoder = CNNEncoder()
+    l2_relation_network = L2RelationNetwork(FEATURE_DIM,RELATION_DIM)
+
+    l2_feature_encoder.cuda(GPU)
+    l2_relation_network.cuda(GPU)
 
     filename_encoder = f"./models/l2norm_cifar10_feature_encoder_{CLASS_NUM}way_{SAMPLE_NUM_PER_CLASS}shot.pkl"
     filename_network = f"./models/l2norm_cifar10_relation_network_{CLASS_NUM}way_{SAMPLE_NUM_PER_CLASS}shot.pkl"
 
-    if os.path.exists(filename_encoder):
-        feature_encoder.load_state_dict(torch.load(filename_encoder))
+    if os.path.exists(filename_encoder): 
+        l2_feature_encoder.load_state_dict(torch.load(filename_encoder))
         print("load feature encoder success")
     if os.path.exists(filename_network):
-        relation_network.load_state_dict(torch.load(filename_network))
+        l2_relation_network.load_state_dict(torch.load(filename_network))
         print("load relation network success")
 
     y_true = []
@@ -177,34 +202,34 @@ def main():
         sample_iterator = iter(trainloader)
         sample_images,sample_labels = next(sample_iterator)
 
-        for test_images,test_labels in testloader:
-            batch_size = test_labels.shape[0]
+        for train_images,train_labels in trainloader:
+            batch_size = train_labels.shape[0]
             # calculate features
-            sample_features = feature_encoder(Variable(sample_images).cuda(GPU)) # 5x64
+            sample_features = l2_feature_encoder(Variable(sample_images).cuda(GPU)) # 5x64
             sample_features = sample_features.view(CLASS_NUM,SAMPLE_NUM_PER_CLASS,FEATURE_DIM,8,8)
             sample_features = torch.sum(sample_features,1).squeeze(1)
-            test_features = feature_encoder(Variable(test_images).cuda(GPU)) # 20x64
+            train_features = l2_feature_encoder(Variable(train_images).cuda(GPU)) # 20x64
 
             # calculate relations
             # each batch sample link to every samples to calculate relations
             # to form a 100x128 matrix for relation network
             sample_features_ext = sample_features.unsqueeze(0).repeat(batch_size,1,1,1,1)
 
-            test_features_ext = test_features.unsqueeze(0).repeat(1*CLASS_NUM,1,1,1,1)
-            test_features_ext = torch.transpose(test_features_ext,0,1)
-            relation_pairs = torch.cat((sample_features_ext,test_features_ext),2).view(-1,FEATURE_DIM*2,8,8)
-            relations = relation_network(relation_pairs).view(-1,CLASS_NUM)
+            train_features_ext = train_features.unsqueeze(0).repeat(1*CLASS_NUM,1,1,1,1)
+            train_features_ext = torch.transpose(train_features_ext,0,1)
+            relation_pairs = torch.cat((sample_features_ext,train_features_ext),2).view(-1,FEATURE_DIM*2,8,8)
+            relations = l2_relation_network(relation_pairs).view(-1,CLASS_NUM)
 
             _,predict_labels = torch.max(relations.data,1)
 
             # save outputs and truth
-            y_true.extend(test_labels.to("cpu"))
+            y_true.extend(train_labels.to("cpu"))
             y_pred.extend(predict_labels.to("cpu"))
 
     # calculate accuracy
     from sklearn.metrics import accuracy_score
     accuracy = accuracy_score(y_true, y_pred)   # get accuracy
-    print(f"Test Accuracy: {accuracy}")
+    print(f"Train Accuracy: {accuracy}")
     
     # make confusion matrix
     cf_mtx = confusion_matrix(y_true, y_pred)
@@ -214,7 +239,72 @@ def main():
     plt.figure(figsize = (12,7))
     sn.heatmap(df, annot=True)
     if not os.path.exists('images'): os.makedirs('images')
-    plt.title('[CIFAR-10] Test set confusion matrix (with L2 and dropout)')
-    plt.savefig('images/l2norm_confusion_mtx.png')
+    plt.title("[CIFAR-10] Training confusion matrix (with L2 and dropout)")
+    plt.savefig('images/train_l2norm_confusion_mtx.png')
+
+    ## Test Normal version of CIFAR model
+    feature_encoder = CNNEncoder()
+    relation_network = L2RelationNetwork(FEATURE_DIM,RELATION_DIM)
+
+    feature_encoder.cuda(GPU)
+    relation_network.cuda(GPU)
+
+    filename_encoder = f"./models/cifar10_feature_encoder_{CLASS_NUM}way_{SAMPLE_NUM_PER_CLASS}shot.pkl"
+    filename_network = f"./models/cifar10_relation_network_{CLASS_NUM}way_{SAMPLE_NUM_PER_CLASS}shot.pkl"
+
+    if os.path.exists(filename_encoder): 
+        l2_feature_encoder.load_state_dict(torch.load(filename_encoder))
+        print("load feature encoder success")
+    if os.path.exists(filename_network):
+        l2_relation_network.load_state_dict(torch.load(filename_network))
+        print("load relation network success")
+
+    y_true = []
+    y_pred = []
+    for _ in range(TEST_EPISODE):
+
+        # kmanakk1 - change how we get samples for compatability with pytorch 1.7
+        sample_iterator = iter(trainloader)
+        sample_images,sample_labels = next(sample_iterator)
+
+        for train_images,train_labels in trainloader:
+            batch_size = train_labels.shape[0]
+            # calculate features
+            sample_features = feature_encoder(Variable(sample_images).cuda(GPU)) # 5x64
+            sample_features = sample_features.view(CLASS_NUM,SAMPLE_NUM_PER_CLASS,FEATURE_DIM,8,8)
+            sample_features = torch.sum(sample_features,1).squeeze(1)
+            train_features = feature_encoder(Variable(train_images).cuda(GPU)) # 20x64
+
+            # calculate relations
+            # each batch sample link to every samples to calculate relations
+            # to form a 100x128 matrix for relation network
+            sample_features_ext = sample_features.unsqueeze(0).repeat(batch_size,1,1,1,1)
+
+            train_features_ext = train_features.unsqueeze(0).repeat(1*CLASS_NUM,1,1,1,1)
+            train_features_ext = torch.transpose(train_features_ext,0,1)
+            relation_pairs = torch.cat((sample_features_ext,train_features_ext),2).view(-1,FEATURE_DIM*2,8,8)
+            relations = relation_network(relation_pairs).view(-1,CLASS_NUM)
+
+            _,predict_labels = torch.max(relations.data,1)
+
+            # save outputs and truth
+            y_true.extend(train_labels.to("cpu"))
+            y_pred.extend(predict_labels.to("cpu"))
+
+    # calculate accuracy
+    from sklearn.metrics import accuracy_score
+    accuracy = accuracy_score(y_true, y_pred)   # get accuracy
+    print(f"Train Accuracy: {accuracy}")
+    
+    # make confusion matrix
+    cf_mtx = confusion_matrix(y_true, y_pred)
+    df = pd.DataFrame(cf_mtx / np.sum(cf_mtx, axis=1)[:, None], index = [i for i in classes],
+                     columns = [i for i in classes])
+    
+    plt.figure(figsize = (12,7))
+    sn.heatmap(df, annot=True)
+    if not os.path.exists('images'): os.makedirs('images')
+    plt.title("[CIFAR-10] Training confusion matrix (baseline)")
+    plt.savefig('images/train_confusion_mtx.png')
 if __name__ == '__main__':
     main()
