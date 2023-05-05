@@ -30,6 +30,10 @@ Then view cifar10/logs/... and miniimagenet/logs/... to see results
 $ cd miniimagenet
 $ python3 l2norm_confusion_mtx.py
 $ python3 miniimagenet_confusion_mtx.py
+$ python3 training_confusion_mtx.py
+
+$ cd ../cifar-10
+$ python3 training_confusion_mtx.py
 ```
 The resultant images will be output to miniimagenet/images/
 For the CIFAR-10 models, the procedure is similar, but I combined the confusion matrix and test scripts, so running ./Test.sh produces the confusion matricies.
