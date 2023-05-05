@@ -282,7 +282,7 @@ def main():
     plt.figure(figsize = (12,7))
     sn.heatmap(df, annot=True)
     if not os.path.exists('images'): os.makedirs('images')
-    plt.title('[mini-imagenet] Train set confusion matrix (with L2 and dropout)')
+    plt.title('[mini-imagenet] Train set confusion matrix (baseline)')
     plt.savefig('images/training_confusion_mtx.png')
 
 if __name__ == '__main__':
